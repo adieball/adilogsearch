@@ -241,31 +241,32 @@ def search():
 
 @app.route("/open", methods=["POST"])
 def open_file():
-    data = request.get_json()
-    path = data.get("path", "")
-    line = int(data.get("line", 1))
-    jump = bool(data.get("jump", False))
-
     try:
-        Path(path).relative_to(LOG_ROOT)
-    except ValueError:
-        return jsonify({"error": "Invalid path"}), 400
+        data = request.get_json(force=True, silent=True) or {}
+        path = data.get("path", "")
+        line = int(data.get("line", 1))
+        jump = bool(data.get("jump", False))
 
-    if jump:
-        for binary, cmd_template in LINE_JUMP_EDITORS:
-            if shutil.which(binary):
-                cmd = [
-                    part.replace("{line}", str(line)).replace("{file}", path)
-                    for part in cmd_template
-                ]
-                _launch(cmd)
-                return jsonify({"ok": True, "editor": binary, "line_supported": True})
-        # No line-aware editor found — fall through to default
+        try:
+            Path(path).relative_to(LOG_ROOT)
+        except ValueError:
+            return jsonify({"error": "Invalid path"}), 400
+
+        if jump:
+            for binary, cmd_template in LINE_JUMP_EDITORS:
+                if shutil.which(binary):
+                    cmd = [
+                        part.replace("{line}", str(line)).replace("{file}", path)
+                        for part in cmd_template
+                    ]
+                    _launch(cmd)
+                    return jsonify({"ok": True, "editor": binary, "line_supported": True})
+            # No line-aware editor found — fall through to default
+
         _open_default(path)
         return jsonify({"ok": True, "editor": "default", "line_supported": False})
-
-    _open_default(path)
-    return jsonify({"ok": True, "editor": "default", "line_supported": False})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
 
 # ---------------------------------------------------------------------------
