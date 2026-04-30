@@ -37,19 +37,42 @@ LOG_ROOT = resolve_log_root()
 # ---------------------------------------------------------------------------
 # Editors with line-jump support, tried in order.
 # {line} → line number, {file} → absolute file path.
+# Each entry: (binary_name, cmd_template, [windows_fallback_paths, ...])
 # Cross-platform editors are listed first.
 # ---------------------------------------------------------------------------
 LINE_JUMP_EDITORS = [
-    ("code",      ["code", "--goto", "{file}:{line}"]),       # VS Code  (Win/Mac/Linux)
-    ("subl",      ["subl", "{file}:{line}"]),                  # Sublime  (Win/Mac/Linux)
-    ("kate",      ["kate", "--line", "{line}", "{file}"]),     # KDE Linux
-    ("kwrite",    ["kwrite", "--line", "{line}", "{file}"]),   # KDE Linux
-    ("gedit",     ["gedit", "+{line}", "{file}"]),             # GNOME
-    ("geany",     ["geany", "--line", "{line}", "{file}"]),    # cross-platform
-    ("pluma",     ["pluma", "+{line}", "{file}"]),             # MATE
-    ("notepad++", ["notepad++", "-n{line}", "{file}"]),        # Windows
-    ("bbedit",    ["bbedit", "+{line}", "{file}"]),            # macOS
+    ("code", ["code", "--goto", "{file}:{line}"], [        # VS Code
+        r"%LOCALAPPDATA%\Programs\Microsoft VS Code\bin\code.cmd",
+        r"%ProgramFiles%\Microsoft VS Code\bin\code.cmd",
+    ]),
+    ("subl", ["subl", "{file}:{line}"], [                  # Sublime Text
+        r"%ProgramFiles%\Sublime Text\subl.exe",
+        r"%ProgramFiles(x86)%\Sublime Text\subl.exe",
+    ]),
+    ("kate",    ["kate",    "--line", "{line}", "{file}"], []),
+    ("kwrite",  ["kwrite",  "--line", "{line}", "{file}"], []),
+    ("gedit",   ["gedit",   "+{line}", "{file}"],          []),
+    ("geany",   ["geany",   "--line", "{line}", "{file}"], []),
+    ("pluma",   ["pluma",   "+{line}", "{file}"],          []),
+    ("notepad++", ["notepad++", "-n{line}", "{file}"], [   # Notepad++
+        r"%ProgramFiles%\Notepad++\notepad++.exe",
+        r"%ProgramFiles(x86)%\Notepad++\notepad++.exe",
+    ]),
+    ("bbedit",  ["bbedit",  "+{line}", "{file}"],          []),  # macOS
 ]
+
+
+def _find_editor(binary, win_fallbacks):
+    """Return the resolved executable path, or None if not found."""
+    found = shutil.which(binary)
+    if found:
+        return found
+    if sys.platform == "win32":
+        for template in win_fallbacks:
+            candidate = Path(os.path.expandvars(template))
+            if candidate.exists():
+                return str(candidate)
+    return None
 
 LINE_RE = re.compile(r"^\[(\d{4}-\d{2}-\d{2})")
 
@@ -255,12 +278,16 @@ def open_file():
             return jsonify({"error": "Invalid path"}), 400
 
         if jump:
-            for binary, cmd_template in LINE_JUMP_EDITORS:
-                if shutil.which(binary):
+            for binary, cmd_template, win_fallbacks in LINE_JUMP_EDITORS:
+                exe = _find_editor(binary, win_fallbacks)
+                if exe:
                     cmd = [
                         part.replace("{line}", str(line)).replace("{file}", path)
                         for part in cmd_template
                     ]
+                    # cmd_template[0] is the binary name; replace it with the
+                    # resolved path so Windows installs not on PATH still work.
+                    cmd[0] = exe
                     _launch(cmd)
                     return jsonify({"ok": True, "editor": binary, "line_supported": True})
             # No line-aware editor found — fall through to default
