@@ -208,6 +208,10 @@ def search_file(filepath, pattern, context, use_regex, case_sensitive,
 def _launch(cmd):
     """Start a detached process (cross-platform)."""
     if sys.platform == "win32":
+        # .cmd/.bat files cannot be executed directly by CreateProcess;
+        # they must go through cmd /c.
+        if cmd and str(cmd[0]).lower().endswith((".cmd", ".bat")):
+            cmd = ["cmd", "/c"] + list(cmd)
         subprocess.Popen(
             cmd,
             creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
@@ -288,8 +292,11 @@ def open_file():
                     # cmd_template[0] is the binary name; replace it with the
                     # resolved path so Windows installs not on PATH still work.
                     cmd[0] = exe
-                    _launch(cmd)
-                    return jsonify({"ok": True, "editor": binary, "line_supported": True})
+                    try:
+                        _launch(cmd)
+                        return jsonify({"ok": True, "editor": binary, "line_supported": True})
+                    except OSError:
+                        continue  # try next editor
             # No line-aware editor found — fall through to default
 
         _open_default(path)

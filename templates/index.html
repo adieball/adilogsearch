@@ -239,7 +239,9 @@ async function openFile(path, line, jump) {
       body: JSON.stringify({path, line, jump: !!jump})
     });
     const data = await resp.json();
-    if (data.ok) {
+    if (data.error) {
+      showToast('Could not open file: ' + data.error);
+    } else if (data.ok) {
       const editorLabel = data.editor === 'default' ? 'default app' : data.editor;
       const lineInfo = (jump && data.line_supported) ? ` at line ${line}` : '';
       const fallbackNote = (jump && !data.line_supported) ? ' (no line-jump support, opened at start)' : '';
