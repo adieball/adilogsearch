@@ -20,7 +20,7 @@ from flask import Flask, render_template, request, jsonify
 # ---------------------------------------------------------------------------
 # Configuration — change this if you are not using CLI args or env vars
 # ---------------------------------------------------------------------------
-DEFAULT_LOG_ROOT = Path.home() / "AdiIRC Logs"
+DEFAULT_LOG_ROOT = Path.home() / "Nextcloud/Apps/Elite Dangerous/AdiIRC Logs"
 
 def resolve_log_root() -> Path:
     if len(sys.argv) > 1:
