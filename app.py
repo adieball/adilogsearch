@@ -42,6 +42,8 @@ LOG_ROOT = resolve_log_root()
 # ---------------------------------------------------------------------------
 LINE_JUMP_EDITORS = [
     ("code", ["code", "--goto", "{file}:{line}"], [        # VS Code
+        r"%LOCALAPPDATA%\Programs\Microsoft VS Code\Code.exe",
+        r"%ProgramFiles%\Microsoft VS Code\Code.exe",
         r"%LOCALAPPDATA%\Programs\Microsoft VS Code\bin\code.cmd",
         r"%ProgramFiles%\Microsoft VS Code\bin\code.cmd",
     ]),
@@ -208,13 +210,13 @@ def search_file(filepath, pattern, context, use_regex, case_sensitive,
 def _launch(cmd):
     """Start a detached process (cross-platform)."""
     if sys.platform == "win32":
-        # .cmd/.bat files cannot be executed directly by CreateProcess;
-        # they must go through cmd /c.
-        if cmd and str(cmd[0]).lower().endswith((".cmd", ".bat")):
-            cmd = ["cmd", "/c"] + list(cmd)
+        # shell=True lets cmd.exe handle .cmd/.bat wrappers transparently and
+        # keeps VS Code's IPC socket reachable (DETACHED_PROCESS breaks it).
+        # CREATE_NO_WINDOW suppresses the console flash.
         subprocess.Popen(
             cmd,
-            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+            shell=True,
+            creationflags=subprocess.CREATE_NO_WINDOW,
         )
     else:
         subprocess.Popen(cmd, start_new_session=True)
